@@ -1,0 +1,483 @@
+{
+  "info": {
+    "name": "Vehicle Tracker API (Local)",
+    "_postman_id": "7d3e2a2e-4c6c-4f1a-9d77-vehicletest",
+    "description": "Collection untuk test API Vehicle Tracker (login cookie-based, vehicles, reports, users/admin).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// set default date = kemarin (YYYY-MM-DD, UTC) bila belum ada",
+          "if (!pm.collectionVariables.get('date')) {",
+          "  const d = new Date(Date.now() - 24*60*60*1000);",
+          "  const yyyy = d.getUTCFullYear();",
+          "  const mm = String(d.getUTCMonth()+1).padStart(2,'0');",
+          "  const dd = String(d.getUTCDate()).padStart(2,'0');",
+          "  pm.collectionVariables.set('date', `${yyyy}-${mm}-${dd}`);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080" },
+    { "key": "adminEmail", "value": "admin@example.com" },
+    { "key": "adminPassword", "value": "Admin123!" },
+    { "key": "userEmail", "value": "user@example.com" },
+    { "key": "userPassword", "value": "User123!" },
+    { "key": "vehicleId", "value": "" },
+    { "key": "userId", "value": "" },
+    { "key": "newUserId", "value": "" },
+    { "key": "date", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["health"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', ()=> pm.response.code===200);",
+                  "pm.test('body ok', ()=> pm.response.json().status==='ok');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "POST /api/auth/login (ADMIN)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', ()=> pm.response.code===200);",
+                  "const json = pm.response.json();",
+                  "pm.test('has user', ()=> json && json.user && json.user.email===pm.collectionVariables.get('adminEmail'));",
+                  "// simpan userId admin (opsional)",
+                  "pm.collectionVariables.set('userId', json.user.id);",
+                  "// cookie accessToken harus ada di response",
+                  "pm.test('set-cookie accessToken ada', ()=> pm.cookies.has('accessToken'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/login (USER)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{userEmail}}\",\n  \"password\": \"{{userPassword}}\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', ()=> pm.response.code===200);",
+                  "pm.test('cookie accessToken terset', ()=> pm.cookies.has('accessToken'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/refresh",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "refresh"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', ()=> pm.response.code===200);",
+                  "pm.test('cookie accessToken renew', ()=> pm.cookies.has('accessToken'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/auth/logout",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', ()=> pm.response.code===200);"]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Vehicles",
+      "item": [
+        {
+          "name": "GET /api/vehicles?page=1&limit=5",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles?page=1&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehicles"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "limit", "value": "5" }
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', ()=> pm.response.code===200);",
+                  "const json = pm.response.json();",
+                  "pm.test('punya items array', ()=> Array.isArray(json.items));",
+                  "if (json.items && json.items.length>0) {",
+                  "  pm.collectionVariables.set('vehicleId', json.items[0].id);",
+                  "  console.log('vehicleId set =>', json.items[0].id);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/vehicles/:id/status?date={{date}}",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles/{{vehicleId}}/status?date={{date}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehicles", "{{vehicleId}}", "status"],
+              "query": [{ "key": "date", "value": "{{date}}" }]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('vehicleId')) {",
+                  "  throw new Error('vehicleId belum ter-set. Jalankan list vehicles dulu.');",
+                  "}"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', ()=> pm.response.code===200);",
+                  "const json = pm.response.json();",
+                  "pm.test('ada summary', ()=> !!json.summary);",
+                  "pm.test('date sesuai', ()=> json.date === pm.collectionVariables.get('date'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/reports/vehicles/:id?date={{date}} (download .xlsx)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reports/vehicles/{{vehicleId}}?date={{date}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reports", "vehicles", "{{vehicleId}}"],
+              "query": [{ "key": "date", "value": "{{date}}" }]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('vehicleId')) throw new Error('vehicleId belum ada.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200', ()=> pm.response.code===200);",
+                  "pm.test('content-type excel', ()=> /spreadsheetml\\.sheet/.test(pm.response.headers.get('Content-Type')) );",
+                  "pm.test('disposition filename ada', ()=> /attachment;\\s*filename=/.test(pm.response.headers.get('Content-Disposition')||'') );"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/vehicles (expect 401 after logout)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/vehicles",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "vehicles"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('unauthorized (401) jika sudah logout', ()=> pm.response.code===401 || pm.response.code===403);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Users (ADMIN only)",
+      "item": [
+        {
+          "name": "GET /api/users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('status 200 (admin)', ()=> pm.response.code===200);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "POST /api/users (create)",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"newuser-{{$timestamp}}@example.com\",\n  \"password\": \"NewUser123!\",\n  \"role\": \"USER\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('created 201', ()=> pm.response.code===201);",
+                  "const json = pm.response.json();",
+                  "pm.collectionVariables.set('newUserId', json.id);",
+                  "pm.test('id tersimpan', ()=> !!pm.collectionVariables.get('newUserId'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "GET /api/users/:id",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{newUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{newUserId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('newUserId')) throw new Error('newUserId belum ada. Jalankan create user.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', ()=> pm.response.code===200);"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "PUT /api/users/:id (update role)",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"role\": \"USER\"\n}",
+              "options": { "raw": { "language": "json" } }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{newUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{newUserId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('newUserId')) throw new Error('newUserId belum ada.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 200', ()=> pm.response.code===200);"]
+              }
+            }
+          ]
+        },
+        {
+          "name": "DELETE /api/users/:id",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/users/{{newUserId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "users", "{{newUserId}}"]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (!pm.collectionVariables.get('newUserId')) throw new Error('newUserId belum ada.');"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": ["pm.test('status 204', ()=> pm.response.code===204);"]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

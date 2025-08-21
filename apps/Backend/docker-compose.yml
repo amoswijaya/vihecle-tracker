@@ -1,0 +1,32 @@
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
+      POSTGRES_DB: vehicledb
+    ports: ["5432:5432"]
+    volumes: [db_data:/var/lib/postgresql/data]
+  adminer:
+    image: adminer
+    ports: ["8081:8080"]
+    depends_on: [db]
+  api:
+    build: .
+    environment:
+      DATABASE_URL: postgres://postgres:postgres@db:5432/vehicledb?schema=public
+      PORT: 8080
+      NODE_ENV: development
+      JWT_ACCESS_SECRET: dev-access
+      JWT_REFRESH_SECRET: dev-refresh
+      ACCESS_TOKEN_EXPIRES_IN: 15m
+      REFRESH_TOKEN_EXPIRES_IN: 7d
+      COOKIE_SECURE: "false"
+      COOKIE_DOMAIN: localhost
+    ports: ["8080:8080"]
+    depends_on: [db]
+    command: sh -c "npm run prisma:deploy && node dist/index.js"
+    volumes:
+      - .:/app
+volumes:
+  db_data:

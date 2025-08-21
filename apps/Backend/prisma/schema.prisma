@@ -1,0 +1,60 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+}
+
+enum SegmentStatus {
+  TRIP
+  IDLE
+  STOPPED
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  role         Role     @default(USER)
+  createdAt    DateTime @default(now())
+  refreshTokens RefreshToken[]
+}
+
+model Vehicle {
+  id          String         @id @default(uuid())
+  name        String
+  plateNumber String         @unique
+  createdAt   DateTime       @default(now())
+  segments    TripSegment[]
+}
+
+model TripSegment {
+  id         String         @id @default(uuid())
+  vehicleId  String
+  status     SegmentStatus
+  startTime  DateTime
+  endTime    DateTime
+  distanceKm Float?
+  vehicle    Vehicle        @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([vehicleId, startTime, endTime])
+}
+
+model RefreshToken {
+  id         String   @id @default(uuid())
+  userId     String
+  hashed     String   // hash dari token plain
+  revoked    Boolean  @default(false)
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revoked, expiresAt])
+}
